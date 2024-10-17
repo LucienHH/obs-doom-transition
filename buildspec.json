@@ -31,11 +31,6 @@
             }
         }
     },
-    "platformConfig": {
-        "macos": {
-            "bundleId": "com.example.obs-plugintemplate"
-        }
-    },
     "name": "obs-doom-transition",
     "displayName": "OBS Doom Transition",
     "version": "1.0.0",

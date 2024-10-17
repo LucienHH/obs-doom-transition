@@ -1,7 +1,3 @@
-Here's a simple README for your **obs-doom-transition** plugin, which enables users to create a "Doom screen melt" style transition in OBS:
-
----
-
 # obs-doom-transition
 
 ![OBS Plugin](https://img.shields.io/badge/OBS-Plugin-blue)

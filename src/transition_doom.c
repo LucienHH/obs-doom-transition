@@ -8,12 +8,48 @@ struct doom_info {
 	gs_eparam_t *a_param;
 	gs_eparam_t *b_param;
 	gs_eparam_t *progress;
+	gs_eparam_t *bars_param;
+	gs_eparam_t *frequency_param;
+	gs_eparam_t *drip_scale_param;
+	gs_eparam_t *noise_param;
+	gs_eparam_t *amplitude_param;
+
+	int bars;
+	float frequency;
+	float drip_scale;
+	float noise;
+	float amplitude;
+
 };
+
+#define S_BARS "bars"
+#define S_FREQUENCY "frequency"
+#define S_DRIP_SCALE "drip_scale"
+#define S_NOISE "noise"
+#define S_AMPLITUDE "amplitude"
+
+#define S_BARS_TEXT obs_module_text("Bars")
+#define S_FREQUENCY_TEXT obs_module_text("Frequency")
+#define S_DRIP_SCALE_TEXT obs_module_text("DripScale")
+#define S_NOISE_TEXT obs_module_text("Noise")
+#define S_AMPLITUDE_TEXT obs_module_text("Amplitude")
 
 static const char *doom_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
 	return obs_module_text("DoomTransition");
+}
+
+static void doom_update(void *data, obs_data_t *settings)
+{
+	struct doom_info *doom = data;
+
+	doom->bars = (int)obs_data_get_int(settings, S_BARS);
+	doom->frequency = (float)obs_data_get_double(settings, S_FREQUENCY);
+	doom->drip_scale = (float)obs_data_get_double(settings, S_DRIP_SCALE);
+	doom->noise = (float)obs_data_get_double(settings, S_NOISE);
+	doom->amplitude = (float)obs_data_get_double(settings, S_AMPLITUDE);
+
 }
 
 static void *doom_create(obs_data_t *settings, obs_source_t *source)
@@ -39,8 +75,14 @@ static void *doom_create(obs_data_t *settings, obs_source_t *source)
 	doom->a_param = gs_effect_get_param_by_name(effect, "tex_a");
 	doom->b_param = gs_effect_get_param_by_name(effect, "tex_b");
 	doom->progress = gs_effect_get_param_by_name(effect, "progress");
+	doom->bars_param = gs_effect_get_param_by_name(effect, "bars");
+	doom->frequency_param = gs_effect_get_param_by_name(effect, "frequency");
+	doom->drip_scale_param = gs_effect_get_param_by_name(effect, "drip_scale");
+	doom->noise_param = gs_effect_get_param_by_name(effect, "noise");
+	doom->amplitude_param = gs_effect_get_param_by_name(effect, "amplitude");
 
-	UNUSED_PARAMETER(settings);
+	obs_source_update(source, settings);
+
 	return doom;
 }
 
@@ -60,6 +102,11 @@ static void doom_callback(void *data, gs_texture_t *a, gs_texture_t *b, float t,
 	gs_effect_set_texture_srgb(doom->a_param, a);
 	gs_effect_set_texture_srgb(doom->b_param, b);
 	gs_effect_set_float(doom->progress, t);
+	gs_effect_set_int(doom->bars_param, doom->bars);
+	gs_effect_set_float(doom->frequency_param, doom->frequency);
+	gs_effect_set_float(doom->drip_scale_param, doom->drip_scale);
+	gs_effect_set_float(doom->noise_param, doom->noise);
+	gs_effect_set_float(doom->amplitude_param, doom->amplitude);
 
 	while (gs_effect_loop(doom->effect, "Doom"))
 		gs_draw_sprite(NULL, 0, cx, cy);
@@ -109,16 +156,44 @@ static enum gs_color_space doom_video_get_color_space(void *data, size_t count, 
 	return obs_transition_video_get_color_space(doom->source);
 }
 
+static obs_properties_t *doom_properties(void *data)
+{
+	obs_properties_t *props = obs_properties_create();
+
+	obs_properties_add_int_slider(props, S_BARS, S_BARS_TEXT, 0, 100, 1);
+	obs_properties_add_float_slider(props, S_FREQUENCY, S_FREQUENCY_TEXT, 0.0, 1.0, 0.01);
+	obs_properties_add_float_slider(props, S_DRIP_SCALE, S_DRIP_SCALE_TEXT, 0.0, 1.0, 0.01);
+	obs_properties_add_float_slider(props, S_NOISE, S_NOISE_TEXT, 0.0, 1.0, 0.01);
+	obs_properties_add_float_slider(props, S_AMPLITUDE, S_AMPLITUDE_TEXT, 0.0, 10.0, 0.01);
+
+	UNUSED_PARAMETER(data);
+	return props;
+}
+
+ static void doom_defaults(obs_data_t *settings)
+ {
+ 	obs_data_set_default_int(settings, S_BARS, (int)30);
+ 	obs_data_set_default_double(settings, S_FREQUENCY, (double)0.5);
+ 	obs_data_set_default_double(settings, S_DRIP_SCALE, (double)0.5);
+ 	obs_data_set_default_double(settings, S_NOISE, (double)0.1);
+ 	obs_data_set_default_double(settings, S_AMPLITUDE, (double)2.0);
+ }
+
+
 struct obs_source_info doom_transition = {
 	.id = "doom_transition",
 	.type = OBS_SOURCE_TYPE_TRANSITION,
 	.get_name = doom_get_name,
 	.create = doom_create,
 	.destroy = doom_destroy,
+	.update = doom_update,
 	.video_render = doom_video_render,
 	.audio_render = doom_audio_render,
+	.get_defaults = doom_defaults,
+	.get_properties = doom_properties,
 	.video_get_color_space = doom_video_get_color_space,
 };
+
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("LucienHH")

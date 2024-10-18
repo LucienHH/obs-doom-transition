@@ -273,19 +273,6 @@ static void doom_faithful_video_render(void *data, gs_effect_t *effect)
 	gs_set_linear_srgb(previous);
 }
 
-static float mix_a(void *data, float t)
-{
-	UNUSED_PARAMETER(data);
-	return 1.0f - t;
-
-}
-
-static float mix_b(void *data, float t)
-{
-	UNUSED_PARAMETER(data);
-	return t;
-}
-
 static bool doom_faithful_audio_render(void *data, uint64_t *ts_out, struct obs_source_audio_mix *audio, uint32_t mixers, size_t channels, size_t sample_rate)
 {
 	struct doom_faithful_info *doom_faithful = data;

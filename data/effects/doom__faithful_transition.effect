@@ -1,0 +1,75 @@
+uniform float4x4 ViewProj;
+uniform texture2d tex_a;
+uniform texture2d tex_b;
+uniform float progress;
+
+sampler_state textureSampler {
+    Filter = Linear;
+    AddressU = Clamp;
+    AddressV = Clamp;
+};
+
+struct VertData {
+    float4 pos : POSITION;
+    float2 uv  : TEXCOORD0;
+};
+
+VertData VSDefault(VertData v_in) {
+    VertData vert_out;
+    vert_out.pos = mul(float4(v_in.pos.xyz, 1.0), ViewProj);
+    vert_out.uv  = v_in.uv;
+    return vert_out;
+}
+
+float rand(float x) {
+    return frac(cos(x * 96753.57931) * 98635.1967);
+}
+
+float smooth_rand(float x) {
+    return sin(x) + sin(1.6*x)*0.5 + sin(4.3*x)*0.25 + sin(7.7*x)*0.125;
+}
+
+float crush(float x, float crush) {
+    return floor(x*crush)/crush;
+}
+
+
+float melt_pattern(float x) {
+    float height;
+    
+    height = smooth_rand(16.0 * crush(x, 320.0));
+    height = crush(height, 8.0);
+    
+    return height;
+}
+
+float inNormal(float x) {
+    if(x >= 0.0 && x <= 1.0){
+        return 1.0;
+    }
+    return 0.0;
+}
+
+float4 PSDoomFaithful(VertData v_in) : TARGET {
+    float2 uv = v_in.uv;
+
+    float animationTime = progress * 1.64;
+
+    float push = melt_pattern(uv.x) * 0.2 + (animationTime - 0.28);
+
+    push = clamp(push, 0.0, 1.0);
+
+    uv.y -= push;
+
+    float4 topColor = tex_a.Sample(textureSampler, uv);
+    float4 bottomColor = tex_b.Sample(textureSampler, v_in.uv);
+
+    return lerp(bottomColor, topColor, inNormal(uv.y));
+}
+
+technique DoomFaithful {
+    pass {
+        vertex_shader = VSDefault(v_in);
+        pixel_shader = PSDoomFaithful(v_in);
+    }
+}

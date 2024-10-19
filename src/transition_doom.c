@@ -14,11 +14,15 @@ struct doom_info {
 	gs_eparam_t *noise_param;
 	gs_eparam_t *amplitude_param;
 
+	gs_texture_t *first_frame;
+	bool first_frame_set;
+
 	int bars;
 	float frequency;
 	float drip_scale;
 	float noise;
 	float amplitude;
+	bool freeze_frame;
 
 };
 
@@ -27,12 +31,14 @@ struct doom_info {
 #define S_DRIP_SCALE "drip_scale"
 #define S_NOISE "noise"
 #define S_AMPLITUDE "amplitude"
+#define S_FREEZE_FRAME "freeze_frame"
 
 #define S_BARS_TEXT obs_module_text("Bars")
 #define S_FREQUENCY_TEXT obs_module_text("Frequency")
 #define S_DRIP_SCALE_TEXT obs_module_text("DripScale")
 #define S_NOISE_TEXT obs_module_text("Noise")
 #define S_AMPLITUDE_TEXT obs_module_text("Amplitude")
+#define S_FREEZE_FRAME_TEXT obs_module_text("FreezeFrame")
 
 static const char *doom_get_name(void *type_data)
 {
@@ -81,6 +87,9 @@ static void *doom_create(obs_data_t *settings, obs_source_t *source)
 	doom->noise_param = gs_effect_get_param_by_name(effect, "noise");
 	doom->amplitude_param = gs_effect_get_param_by_name(effect, "amplitude");
 
+	doom->first_frame = NULL;
+	doom->first_frame_set = false;
+
 	obs_source_update(source, settings);
 
 	return doom;
@@ -99,7 +108,13 @@ static void doom_callback(void *data, gs_texture_t *a, gs_texture_t *b, float t,
 	const bool previous = gs_framebuffer_srgb_enabled();
 	gs_enable_framebuffer_srgb(true);
 
-	gs_effect_set_texture_srgb(doom->a_param, a);
+	if (!doom->first_frame_set) {
+		doom->first_frame = gs_texture_create(gs_texture_get_width(a), gs_texture_get_height(a), GS_RGBA, 1, NULL, GS_DYNAMIC);
+		gs_copy_texture(doom->first_frame, a);
+		doom->first_frame_set = true;
+	}
+
+	gs_effect_set_texture_srgb(doom->a_param, doom->freeze_frame ? doom->first_frame : a);
 	gs_effect_set_texture_srgb(doom->b_param, b);
 	gs_effect_set_float(doom->progress, t);
 	gs_effect_set_int(doom->bars_param, doom->bars);
@@ -160,6 +175,7 @@ static obs_properties_t *doom_properties(void *data)
 {
 	obs_properties_t *props = obs_properties_create();
 
+	obs_properties_add_bool(props, S_FREEZE_FRAME, S_FREEZE_FRAME_TEXT);
 	obs_properties_add_int_slider(props, S_BARS, S_BARS_TEXT, 0, 100, 1);
 	obs_properties_add_float_slider(props, S_FREQUENCY, S_FREQUENCY_TEXT, 0.0, 1.0, 0.01);
 	obs_properties_add_float_slider(props, S_DRIP_SCALE, S_DRIP_SCALE_TEXT, 0.0, 1.0, 0.01);
@@ -177,6 +193,33 @@ static void doom_defaults(obs_data_t *settings)
  	obs_data_set_default_double(settings, S_DRIP_SCALE, (double)0.5);
  	obs_data_set_default_double(settings, S_NOISE, (double)0.1);
  	obs_data_set_default_double(settings, S_AMPLITUDE, (double)2.0);
+	obs_data_set_default_bool(settings, S_FREEZE_FRAME, true);
+}
+
+static void doom_transition_start(void *data)
+{
+
+	struct doom_info *doom = data;
+
+	if (doom->first_frame) {
+		gs_texture_destroy(doom->first_frame);
+		doom->first_frame = NULL;
+		doom->first_frame_set = false;
+	}
+
+}
+
+static void doom_transition_stop(void *data)
+{
+
+	struct doom_info *doom = data;
+
+	if (doom->first_frame) {
+		gs_texture_destroy(doom->first_frame);
+		doom->first_frame = NULL;
+		doom->first_frame_set = false;
+	}
+
 }
 
 struct obs_source_info doom_transition = {
@@ -190,6 +233,8 @@ struct obs_source_info doom_transition = {
 	.audio_render = doom_audio_render,
 	.get_defaults = doom_defaults,
 	.get_properties = doom_properties,
+	.transition_start = doom_transition_start,
+	.transition_stop = doom_transition_stop,
 	.video_get_color_space = doom_video_get_color_space,
 };
 
@@ -201,6 +246,10 @@ struct doom_faithful_info {
 	gs_eparam_t *b_param;
 	gs_eparam_t *progress;
 
+	gs_texture_t *first_frame;
+	bool first_frame_set;
+
+	bool freeze_frame;
 };
 
 static const char *doom_faithful_get_name(void *type_data)
@@ -232,6 +281,9 @@ static void *doom_faithful_create(obs_data_t *settings, obs_source_t *source)
 	doom_faithful->b_param = gs_effect_get_param_by_name(effect, "tex_b");
 	doom_faithful->progress = gs_effect_get_param_by_name(effect, "progress");
 
+	doom_faithful->first_frame = NULL;
+	doom_faithful->first_frame_set = false;
+
 	UNUSED_PARAMETER(settings);
 
 	return doom_faithful;
@@ -241,7 +293,13 @@ static void doom_faithful_destroy(void *data)
 {
 	struct doom_faithful_info *doom_faithful = data;
 	bfree(doom_faithful);
+}
 
+static void doom_faithful_update(void *data, obs_data_t *settings)
+{
+	struct doom_faithful_info *doom_faithful = data;
+
+	doom_faithful->freeze_frame = obs_data_get_bool(settings, S_FREEZE_FRAME);
 }
 
 static void doom_faithful_callback(void *data, gs_texture_t *a, gs_texture_t *b, float t, uint32_t cx, uint32_t cy)
@@ -251,7 +309,13 @@ static void doom_faithful_callback(void *data, gs_texture_t *a, gs_texture_t *b,
 	const bool previous = gs_framebuffer_srgb_enabled();
 	gs_enable_framebuffer_srgb(true);
 
-	gs_effect_set_texture_srgb(doom_faithful->a_param, a);
+	if (!doom_faithful->first_frame_set) {
+		doom_faithful->first_frame = gs_texture_create(gs_texture_get_width(a), gs_texture_get_height(a), GS_RGBA, 1, NULL, GS_DYNAMIC);
+		gs_copy_texture(doom_faithful->first_frame, a);
+		doom_faithful->first_frame_set = true;
+	}
+
+	gs_effect_set_texture_srgb(doom_faithful->a_param, doom_faithful->freeze_frame ? doom_faithful->first_frame : a);
 	gs_effect_set_texture_srgb(doom_faithful->b_param, b);
 	gs_effect_set_float(doom_faithful->progress, t);
 
@@ -287,14 +351,60 @@ static enum gs_color_space doom_faithful_video_get_color_space(void *data, size_
 	return obs_transition_video_get_color_space(doom_faithful->source);
 }
 
+static void doom_faithful_transition_start(void *data)
+{
+
+	struct doom_faithful_info *doom_faithful = data;
+
+	if (doom_faithful->first_frame) {
+		gs_texture_destroy(doom_faithful->first_frame);
+		doom_faithful->first_frame = NULL;
+		doom_faithful->first_frame_set = false;
+	}
+
+}
+
+static void doom_faithful_transition_stop(void *data)
+{
+
+	struct doom_faithful_info *doom_faithful = data;
+
+	if (doom_faithful->first_frame) {
+		gs_texture_destroy(doom_faithful->first_frame);
+		doom_faithful->first_frame = NULL;
+		doom_faithful->first_frame_set = false;
+	}
+
+}
+
+static obs_properties_t *doom_faithful_properties(void *data)
+{
+	obs_properties_t *props = obs_properties_create();
+
+	obs_properties_add_bool(props, S_FREEZE_FRAME, S_FREEZE_FRAME_TEXT);
+
+	UNUSED_PARAMETER(data);
+	return props;
+}
+
+static void doom_faithful_defaults(obs_data_t *settings)
+{
+	obs_data_set_default_bool(settings, S_FREEZE_FRAME, true);
+}
+
 struct obs_source_info doom_faithful_transition = {
 	.id = "doom_faithful_transition",
 	.type = OBS_SOURCE_TYPE_TRANSITION,
 	.get_name = doom_faithful_get_name,
 	.create = doom_faithful_create,
 	.destroy = doom_faithful_destroy,
+	.update = doom_faithful_update,
 	.video_render = doom_faithful_video_render,
 	.audio_render = doom_faithful_audio_render,
+	.transition_start = doom_faithful_transition_start,
+	.transition_stop = doom_faithful_transition_stop,
+	.get_defaults = doom_faithful_defaults,
+	.get_properties = doom_faithful_properties,
 	.video_get_color_space = doom_faithful_video_get_color_space,
 };
 

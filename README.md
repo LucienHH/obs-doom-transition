@@ -23,7 +23,23 @@
 
 ### macOS / Linux
 
-Installation instructions for macOS and Linux will be added soon.
+Installation instructions for macOS and Linux will be added soon. You can try to compile the plugin yourself on Linux using the guide below.
+
+#### How to manually build plugin on Linux (Ubuntu/Debian/Mint):
+
+```
+git clone https://github.com/LucienHH/obs-doom-transition/
+cd obs-doom-transition
+sudo apt-get install cmake build-essential
+mkdir build
+cd build
+cmake ..
+make
+```
+
+1. Create `~/.config/obs-studio/plugins/obs-doom-transition` folder
+2. copy freshly built `obs-doom-transition.so` file from the `build/` folder in cloned git repo to `bin/64bit/` subfolder of the plugin folder
+3. copy contents of entire `data/` folder from the git repo to `~/.config/obs-studio/plugins/obs-doom-transition/data`
 
 ## Usage
 

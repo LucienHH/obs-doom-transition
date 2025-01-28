@@ -408,7 +408,7 @@ static obs_properties_t *doom_faithful_properties(void *data)
 static void doom_faithful_defaults(obs_data_t *settings)
 {
 	obs_data_set_default_bool(settings, S_FREEZE_FRAME, true);
-	obs_data_set_default_bool(settings, S_RANDOMISE_BARS, false);
+	obs_data_set_default_bool(settings, S_RANDOMISE_BARS, true);
 }
 
 struct obs_source_info doom_faithful_transition = {

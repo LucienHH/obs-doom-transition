@@ -2,6 +2,7 @@ uniform float4x4 ViewProj;
 uniform texture2d tex_a;
 uniform texture2d tex_b;
 uniform float progress;
+uniform float seed;
 
 sampler_state textureSampler {
     Filter = Linear;
@@ -33,11 +34,10 @@ float crush(float x, float crush) {
     return floor(x*crush)/crush;
 }
 
-
 float melt_pattern(float x) {
     float height;
     
-    height = smooth_rand(16.0 * crush(x, 320.0));
+    height = smooth_rand(16.0 * crush(x, 320.0) + seed);
     height = crush(height, 8.0);
     
     return height;

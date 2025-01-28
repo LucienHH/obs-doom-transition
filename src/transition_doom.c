@@ -32,6 +32,7 @@ struct doom_info {
 #define S_NOISE "noise"
 #define S_AMPLITUDE "amplitude"
 #define S_FREEZE_FRAME "freeze_frame"
+#define S_RANDOMISE_BARS "randomise_bars"
 
 #define S_BARS_TEXT obs_module_text("Bars")
 #define S_FREQUENCY_TEXT obs_module_text("Frequency")
@@ -39,6 +40,7 @@ struct doom_info {
 #define S_NOISE_TEXT obs_module_text("Noise")
 #define S_AMPLITUDE_TEXT obs_module_text("Amplitude")
 #define S_FREEZE_FRAME_TEXT obs_module_text("FreezeFrame")
+#define S_RANDOMISE_BARS_TEXT obs_module_text("RandomiseBars")
 
 static const char *doom_get_name(void *type_data)
 {
@@ -245,11 +247,14 @@ struct doom_faithful_info {
 	gs_eparam_t *a_param;
 	gs_eparam_t *b_param;
 	gs_eparam_t *progress;
+	gs_eparam_t *seed;
 
 	gs_texture_t *first_frame;
 	bool first_frame_set;
 
 	bool freeze_frame;
+	bool randomise_bars;
+	float seed_value;
 };
 
 static const char *doom_faithful_get_name(void *type_data)
@@ -280,6 +285,7 @@ static void *doom_faithful_create(obs_data_t *settings, obs_source_t *source)
 	doom_faithful->a_param = gs_effect_get_param_by_name(effect, "tex_a");
 	doom_faithful->b_param = gs_effect_get_param_by_name(effect, "tex_b");
 	doom_faithful->progress = gs_effect_get_param_by_name(effect, "progress");
+	doom_faithful->seed = gs_effect_get_param_by_name(effect, "seed");
 
 	doom_faithful->first_frame = NULL;
 	doom_faithful->first_frame_set = false;
@@ -300,6 +306,7 @@ static void doom_faithful_update(void *data, obs_data_t *settings)
 	struct doom_faithful_info *doom_faithful = data;
 
 	doom_faithful->freeze_frame = obs_data_get_bool(settings, S_FREEZE_FRAME);
+	doom_faithful->randomise_bars = obs_data_get_bool(settings, S_RANDOMISE_BARS);
 }
 
 static void doom_faithful_callback(void *data, gs_texture_t *a, gs_texture_t *b, float t, uint32_t cx, uint32_t cy)
@@ -315,9 +322,15 @@ static void doom_faithful_callback(void *data, gs_texture_t *a, gs_texture_t *b,
 		doom_faithful->first_frame_set = true;
 	}
 
+	if (doom_faithful->seed_value == 0.0f) {
+		doom_faithful->seed_value = (float)rand() / (float)RAND_MAX * (float)gs_texture_get_width(a);
+	}
+
 	gs_effect_set_texture_srgb(doom_faithful->a_param, doom_faithful->freeze_frame ? doom_faithful->first_frame : a);
 	gs_effect_set_texture_srgb(doom_faithful->b_param, b);
 	gs_effect_set_float(doom_faithful->progress, t);
+
+	gs_effect_set_float(doom_faithful->seed, doom_faithful->randomise_bars ? doom_faithful->seed_value : 0.0f);
 
 	while (gs_effect_loop(doom_faithful->effect, "DoomFaithful"))
 		gs_draw_sprite(NULL, 0, cx, cy);
@@ -362,6 +375,8 @@ static void doom_faithful_transition_start(void *data)
 		doom_faithful->first_frame_set = false;
 	}
 
+	doom_faithful->seed_value = 0.0f;
+
 }
 
 static void doom_faithful_transition_stop(void *data)
@@ -375,6 +390,8 @@ static void doom_faithful_transition_stop(void *data)
 		doom_faithful->first_frame_set = false;
 	}
 
+	doom_faithful->seed_value = 0.0f;
+
 }
 
 static obs_properties_t *doom_faithful_properties(void *data)
@@ -382,6 +399,7 @@ static obs_properties_t *doom_faithful_properties(void *data)
 	obs_properties_t *props = obs_properties_create();
 
 	obs_properties_add_bool(props, S_FREEZE_FRAME, S_FREEZE_FRAME_TEXT);
+	obs_properties_add_bool(props, S_RANDOMISE_BARS, S_RANDOMISE_BARS_TEXT);
 
 	UNUSED_PARAMETER(data);
 	return props;
@@ -390,6 +408,7 @@ static obs_properties_t *doom_faithful_properties(void *data)
 static void doom_faithful_defaults(obs_data_t *settings)
 {
 	obs_data_set_default_bool(settings, S_FREEZE_FRAME, true);
+	obs_data_set_default_bool(settings, S_RANDOMISE_BARS, false);
 }
 
 struct obs_source_info doom_faithful_transition = {

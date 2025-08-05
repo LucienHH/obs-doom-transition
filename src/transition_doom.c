@@ -91,6 +91,14 @@ static void *doom_create(obs_data_t *settings, obs_source_t *source)
 	doom->amplitude_param = gs_effect_get_param_by_name(effect, "amplitude");
 
 	if (!doom->a_param) blog(LOG_ERROR, "tex_a parameter not found");
+	if (!doom->b_param) blog(LOG_ERROR, "tex_b parameter not found");
+	if (!doom->progress) blog(LOG_ERROR, "progress parameter not found");
+	if (!doom->bars_param) blog(LOG_ERROR, "bars parameter not found");
+	if (!doom->frequency_param) blog(LOG_ERROR, "frequency parameter not found");
+	if (!doom->drip_scale_param) blog(LOG_ERROR, "drip_scale parameter not found");
+	if (!doom->noise_param) blog(LOG_ERROR, "noise parameter not found");
+	if (!doom->amplitude_param) blog(LOG_ERROR, "amplitude parameter not found");
+
 	doom->first_frame = NULL;
 	doom->first_frame_set = false;
 

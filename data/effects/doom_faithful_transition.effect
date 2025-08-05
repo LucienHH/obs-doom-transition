@@ -22,8 +22,12 @@ VertData VSDefault(VertData v_in) {
     return vert_out;
 }
 
+float fract(float x) {
+    return x - floor(x);
+}
+
 float rand(float x) {
-    return frac(cos(x * 96753.57931) * 98635.1967);
+    return fract(cos(x * 96753.57931) * 98635.1967);
 }
 
 float smooth_rand(float x) {

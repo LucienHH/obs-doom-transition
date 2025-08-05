@@ -57,6 +57,7 @@ static void doom_update(void *data, obs_data_t *settings)
 	doom->drip_scale = (float)obs_data_get_double(settings, S_DRIP_SCALE);
 	doom->noise = (float)obs_data_get_double(settings, S_NOISE);
 	doom->amplitude = (float)obs_data_get_double(settings, S_AMPLITUDE);
+	doom->freeze_frame = obs_data_get_bool(settings, S_FREEZE_FRAME);
 
 }
 
@@ -89,6 +90,7 @@ static void *doom_create(obs_data_t *settings, obs_source_t *source)
 	doom->noise_param = gs_effect_get_param_by_name(effect, "noise");
 	doom->amplitude_param = gs_effect_get_param_by_name(effect, "amplitude");
 
+	if (!doom->a_param) blog(LOG_ERROR, "tex_a parameter not found");
 	doom->first_frame = NULL;
 	doom->first_frame_set = false;
 
@@ -119,11 +121,12 @@ static void doom_callback(void *data, gs_texture_t *a, gs_texture_t *b, float t,
 	gs_effect_set_texture_srgb(doom->a_param, doom->freeze_frame ? doom->first_frame : a);
 	gs_effect_set_texture_srgb(doom->b_param, b);
 	gs_effect_set_float(doom->progress, t);
-	gs_effect_set_int(doom->bars_param, doom->bars);
-	gs_effect_set_float(doom->frequency_param, doom->frequency);
-	gs_effect_set_float(doom->drip_scale_param, doom->drip_scale);
-	gs_effect_set_float(doom->noise_param, doom->noise);
-	gs_effect_set_float(doom->amplitude_param, doom->amplitude);
+	
+	if (doom->bars_param) gs_effect_set_int(doom->bars_param, doom->bars);
+	if (doom->frequency_param) gs_effect_set_float(doom->frequency_param, doom->frequency);
+	if (doom->drip_scale_param) gs_effect_set_float(doom->drip_scale_param, doom->drip_scale);
+	if (doom->noise_param) gs_effect_set_float(doom->noise_param, doom->noise);
+	if (doom->amplitude_param) gs_effect_set_float(doom->amplitude_param, doom->amplitude);
 
 	while (gs_effect_loop(doom->effect, "Doom"))
 		gs_draw_sprite(NULL, 0, cx, cy);
@@ -257,6 +260,8 @@ struct doom_faithful_info {
 	float seed_value;
 };
 
+static void doom_faithful_update(void *data, obs_data_t *settings);
+
 static const char *doom_faithful_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
@@ -279,18 +284,31 @@ static void *doom_faithful_create(obs_data_t *settings, obs_source_t *source)
 		return NULL;
 	}
 
+	blog(LOG_INFO, "doom_faithful effect loaded successfully");
+
 	doom_faithful = bmalloc(sizeof(*doom_faithful));
 	doom_faithful->source = source;
 	doom_faithful->effect = effect;
+	
+	obs_enter_graphics();
 	doom_faithful->a_param = gs_effect_get_param_by_name(effect, "tex_a");
 	doom_faithful->b_param = gs_effect_get_param_by_name(effect, "tex_b");
 	doom_faithful->progress = gs_effect_get_param_by_name(effect, "progress");
 	doom_faithful->seed = gs_effect_get_param_by_name(effect, "seed");
+	obs_leave_graphics();
+
+	// Debug: Check for NULL parameters in doom_faithful
+	if (!doom_faithful->a_param) blog(LOG_ERROR, "doom_faithful: tex_a parameter not found");
+	if (!doom_faithful->b_param) blog(LOG_ERROR, "doom_faithful: tex_b parameter not found");
+	if (!doom_faithful->progress) blog(LOG_ERROR, "doom_faithful: progress parameter not found");
+	if (!doom_faithful->seed) blog(LOG_ERROR, "doom_faithful: seed parameter not found");
 
 	doom_faithful->first_frame = NULL;
 	doom_faithful->first_frame_set = false;
 
-	UNUSED_PARAMETER(settings);
+	doom_faithful->seed_value = (float)rand() / (float)RAND_MAX * 1000.0f;
+
+	doom_faithful_update(doom_faithful, settings);
 
 	return doom_faithful;
 }
@@ -322,15 +340,13 @@ static void doom_faithful_callback(void *data, gs_texture_t *a, gs_texture_t *b,
 		doom_faithful->first_frame_set = true;
 	}
 
-	if (doom_faithful->seed_value == 0.0f) {
-		doom_faithful->seed_value = (float)rand() / (float)RAND_MAX * (float)gs_texture_get_width(a);
-	}
-
 	gs_effect_set_texture_srgb(doom_faithful->a_param, doom_faithful->freeze_frame ? doom_faithful->first_frame : a);
 	gs_effect_set_texture_srgb(doom_faithful->b_param, b);
 	gs_effect_set_float(doom_faithful->progress, t);
 
-	gs_effect_set_float(doom_faithful->seed, doom_faithful->randomise_bars ? doom_faithful->seed_value : 0.0f);
+	if (doom_faithful->seed) {
+		gs_effect_set_float(doom_faithful->seed, doom_faithful->randomise_bars ? doom_faithful->seed_value : 0.0f);
+	}
 
 	while (gs_effect_loop(doom_faithful->effect, "DoomFaithful"))
 		gs_draw_sprite(NULL, 0, cx, cy);
@@ -375,8 +391,7 @@ static void doom_faithful_transition_start(void *data)
 		doom_faithful->first_frame_set = false;
 	}
 
-	doom_faithful->seed_value = 0.0f;
-
+	doom_faithful->seed_value = (float)rand() / (float)RAND_MAX * 1000.0f;
 }
 
 static void doom_faithful_transition_stop(void *data)
